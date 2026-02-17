@@ -902,10 +902,15 @@ async function inviteByEmail(email: string) {
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: "18px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 10 }}>
-        Att handla hem 🦦
-      </h1>
+    <main style={{ maxWidth: 560, margin: "0 auto", padding: "44px 18px 100px" }}>
+      <div style={{ marginBottom: 20 }}>
+  <div style={{ fontSize: 11, color: "#bbb", fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 4 }}>
+    Hushållets lista
+  </div>
+  <h1 style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em", color: "#1a1a1a", margin: 0 }}>
+    Hemmet 🦦
+  </h1>
+</div>
       {!session ? (
   <>
     <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
@@ -1037,46 +1042,53 @@ async function inviteByEmail(email: string) {
   </button>
 </div>
       <form onSubmit={onSubmit} style={{ display: "flex", gap: 8 }}>
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            if (inlineMsg) setInlineMsg(null);
-          }}
-          onFocus={() => {
-            if (filtered.length > 0) setShowDropdown(true);
-          }}
-          placeholder="Skriv en vara, t.ex. mjölk"
-          style={{
-            ...fieldStyle,
-            flex: 1,
-            padding: "12px 12px",
-            border: "1px solid #d6d6d6",
-            borderRadius: 14,
-            fontSize: 16,
-            outline: "none",
-          }}
-        />
+  <input
+    ref={inputRef}
+    value={text}
+    onChange={(e) => {
+      setText(e.target.value);
+      if (inlineMsg) setInlineMsg(null);
+    }}
+    onFocus={() => {
+      if (filtered.length > 0) setShowDropdown(true);
+    }}
+    placeholder="Lägg till vara…"
+    style={{
+      flex: 1,
+      height: 48,
+      padding: "0 16px",
+      border: "1.5px solid #ede9e2",
+      borderRadius: 14,
+      fontSize: 15,
+      outline: "none",
+      background: "#fff",
+      fontFamily: "'DM Sans', sans-serif",
+      color: "#1a1a1a",
+    }}
+  />
 
-        <button
-          type="submit"
-          disabled={isAddDisabled}
-          style={{
-              height: 40,
-              padding: "0 14px",
-              borderRadius: 14,
-              border: "1px solid #d6d6d6",
-              background: isAddDisabled ? "#f2f2f2" : "white",
-              cursor: isAddDisabled ? "not-allowed" : "pointer",
-              fontWeight: 800,
-              fontSize: 16,
-              whiteSpace: "nowrap",
-          }}
-        >
-          Lägg till
-        </button>
-      </form>
+  <button
+    type="submit"
+    disabled={isAddDisabled}
+    style={{
+      height: 48,
+      width: 48,
+      borderRadius: 14,
+      border: "none",
+      background: isAddDisabled ? "#ddd" : "#3d3530",
+      color: "#f7f4ef",
+      cursor: isAddDisabled ? "not-allowed" : "pointer",
+      fontWeight: 700,
+      fontSize: 24,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    }}
+  >
+    +
+  </button>
+</form>
       {inlineMsg && (
   <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: "#b45309" }}>
     {inlineMsg}
@@ -1129,15 +1141,31 @@ async function inviteByEmail(email: string) {
       {Object.entries(groupedTodo).map(([category, list]) => (
         <div key={category} style={{ marginTop: 14 }}>
           <div
-            style={{
-              fontSize: 13,
-              fontWeight: 900,
-              color: "#555",
-              marginBottom: 8,
-            }}
-          >
-            {category}
-          </div>
+  style={{
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    color: "#9e9790",
+    marginBottom: 6,
+    marginTop: 18,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  }}
+>
+  <span>{category}</span>
+  <span style={{
+    background: "#ede9e2",
+    color: "#9e9790",
+    fontSize: 10,
+    fontWeight: 600,
+    padding: "1px 6px",
+    borderRadius: 20,
+  }}>
+    {list.length}
+  </span>
+</div>
 
           <ul style={{ paddingLeft: 0, listStyle: "none", margin: 0 }}>
             {list.map((item) => (
@@ -1191,32 +1219,49 @@ async function inviteByEmail(email: string) {
   onPointerCancel={(e) => onPointerUp(item.id, e)}
   style={{
     transform: `translateX(${getX(item.id)}px)`,
-        willChange: "transform",
-
-        transition: draggingId.current === item.id ? "none" : "transform 160ms ease",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 8,
-        padding: "8px 10px",
-        border: "1px solid #eee",
-        borderRadius: 12,
-        background: "white",
-        touchAction: "pan-y",
-        userSelect: "none",
-        WebkitUserSelect: "none", // viktigt: scroll ska kännas normalt
-      }}
-    >
+    willChange: "transform",
+    transition: draggingId.current === item.id ? "none" : "transform 160ms ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: "10px 12px",
+    border: "1px solid #ede9e2",
+    borderRadius: 12,
+    background: "#fff",
+    touchAction: "pan-y",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+  }}
+>
       
-      <label style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-        <input
-          type="checkbox"
-          checked={item.done}
-          onChange={() => { void toggleDone(item.id); }}
-          style={{ width: 18, height: 18 }}
-        />
+      <label
+  style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: "pointer" }}
+  onClick={() => { void toggleDone(item.id); }}
+>
+  <div
+    style={{
+      width: 20,
+      height: 20,
+      minWidth: 20,
+      borderRadius: "50%",
+      border: item.done ? "none" : "1.5px solid #c8c2b8",
+      background: item.done ? "#3d3530" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      pointerEvents: "none",
+    }}
+  >
+    {item.done && (
+      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+        <path d="M1 3.5L3.5 6.5L9 1" stroke="#f7f4ef" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    )}
+  </div>
 
-        {editingId === item.id ? (
+  {editingId === item.id ? (
           <input
             value={editingText}
             onChange={(e) => setEditingText(e.target.value)}
@@ -1246,21 +1291,21 @@ async function inviteByEmail(email: string) {
             aria-label="Spara"
             title="Spara"
             style={{
-              border: "1px solid #ddd",
-              background: "white",
-              borderRadius: 9,
-              width: 30,
-              height: 30,
-              cursor: "pointer",
-              fontWeight: 900,
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1,
-            }}
-          >
-            ✅
+  border: "none",
+  background: "#3d3530",
+  borderRadius: 9,
+  width: 30,
+  height: 30,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#f7f4ef",
+}}
+>
+  <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+    <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
           </button>
 
           <button
@@ -1269,21 +1314,21 @@ async function inviteByEmail(email: string) {
             aria-label="Avbryt"
             title="Avbryt"
             style={{
-              border: "1px solid #ddd",
-              background: "white",
-              borderRadius: 9,
-              width: 30,
-              height: 30,
-              cursor: "pointer",
-              fontWeight: 900,
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1,
-            }}
-          >
-            ✖️
+  border: "1px solid #ede9e2",
+  background: "white",
+  borderRadius: 9,
+  width: 30,
+  height: 30,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#9e9790",
+}}
+>
+  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+    <path d="M1 1L10 10M10 1L1 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
           </button>
         </div>
       ) : (
@@ -1294,21 +1339,21 @@ async function inviteByEmail(email: string) {
             aria-label="Redigera"
             title="Redigera"
             style={{
-              border: "1px solid #ddd",
-              background: "white",
-              borderRadius: 9,
-              width: 30,
-              height: 30,
-              cursor: "pointer",
-              fontWeight: 900,
-              fontSize: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1,
-            }}
-          >
-            ✏️
+  border: "1px solid #ede9e2",
+  background: "white",
+  borderRadius: 9,
+  width: 30,
+  height: 30,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#9e9790",
+}}
+>
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+    <path d="M9 2L11 4L4 11H2V9L9 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
           </button>
         </div>
       )}
@@ -1324,10 +1369,30 @@ async function inviteByEmail(email: string) {
 </section>
 
           {/* KLART */}
-          <section style={{ marginTop: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: "#555", marginBottom: 8 }}>
-              Klart
-            </div>
+          <section style={{ marginTop: 24 }}>
+  <div style={{
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    color: "#9e9790",
+    marginBottom: 6,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  }}>
+    <span>Klart</span>
+    <span style={{
+      background: "#ede9e2",
+      color: "#9e9790",
+      fontSize: 10,
+      fontWeight: 600,
+      padding: "1px 6px",
+      borderRadius: 20,
+    }}>
+      {doneItems.length}
+    </span>
+  </div>
 
             {doneItems.length === 0 ? (
               <p style={{ color: "#888", marginTop: 6 }}>Inget handlat än.</p>
@@ -1335,31 +1400,44 @@ async function inviteByEmail(email: string) {
               <ul style={{ paddingLeft: 0, listStyle: "none", margin: 0 }}>
                 {doneItems.map((item) => (
                   <li
-                    key={item.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      padding: "8px 10px",
-                      border: "1px solid #eee",
-                      borderRadius: 12,
-                      background: "#f6f6f6",
-                      marginBottom: 8,
-                      opacity: 0.9,
-                    }}
-                  >
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                      <input
-                        type="checkbox"
-                        checked={item.done}
-                        onChange={() => toggleDone(item.id)}
-                        style={{ width: 16, height: 16 }}
-                      />
-                      <span style={{ fontSize: 14, fontWeight: 650, textDecoration: "line-through" }}>
-                        {item.name}
-                      </span>
-                    </label>
+  key={item.id}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: "10px 12px",
+    border: "1px solid #ede9e2",
+    borderRadius: 12,
+    background: "#f7f4ef",
+    marginBottom: 5,
+    opacity: 0.6,
+  }}
+>
+  <label style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+    <div
+      onClick={() => { void toggleDone(item.id); }}
+      style={{
+        width: 20,
+        height: 20,
+        minWidth: 20,
+        borderRadius: "50%",
+        background: "#3d3530",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+        <path d="M1 3.5L3.5 6.5L9 1" stroke="#f7f4ef" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+    <span style={{ fontSize: 14, color: "#9e9790", textDecoration: "line-through" }}>
+      {item.name}
+    </span>
+  </label>
 
                     <button
                       type="button"
@@ -1390,44 +1468,46 @@ async function inviteByEmail(email: string) {
             </section>
       {/* UNDO TOAST */}
       {undo && (
-        <div
-          style={{
-            position: "fixed",
-            left: 12,
-            right: 12,
-            bottom: 12,
-            maxWidth: 560,
-            margin: "0 auto",
-            borderRadius: 14,
-            border: "1px solid #ddd",
-            background: "white",
-            padding: "12px 12px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          }}
-        >
-          <div style={{ fontSize: 14, color: "#111", fontWeight: 650 }}>
-            {undo.message}
-          </div>
-          <button
-            type="button"
-            onClick={doUndo}
-            style={{
-              border: "1px solid #111",
-              background: "white",
-              borderRadius: 12,
-              padding: "10px 12px",
-              cursor: "pointer",
-              fontWeight: 900,
-            }}
-          >
-            Ångra
-          </button>
-        </div>
-      )}
+  <div
+    style={{
+      position: "fixed",
+      left: 16,
+      right: 16,
+      bottom: 90,
+      maxWidth: 560,
+      margin: "0 auto",
+      borderRadius: 14,
+      background: "#3d3530",
+      padding: "12px 16px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      boxShadow: "0 8px 28px rgba(0,0,0,0.15)",
+    }}
+  >
+    <div style={{ fontSize: 13, color: "#c8c2b8" }}>
+      {undo.message}
+    </div>
+    <button
+      type="button"
+      onClick={doUndo}
+      style={{
+        border: "none",
+        background: "#f7f4ef",
+        color: "#3d3530",
+        borderRadius: 8,
+        padding: "6px 14px",
+        cursor: "pointer",
+        fontWeight: 600,
+        fontSize: 13,
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      Ångra
+    </button>
+  </div>
+)}
       {shareOpen && (
   <div
     onMouseDown={() => setShareOpen(false)}

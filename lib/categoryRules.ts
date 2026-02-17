@@ -49,6 +49,7 @@ export const CATEGORY_RULES: CategoryRule[] = [
     "mangold",
     "melon",
     "morot",
+    "morötter",
     "nektarin",
     "pak choy",
     "palmkål",
