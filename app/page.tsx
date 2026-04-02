@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase"; // <-- ändra sökväg så den matchar var din fil ligger
 // t.ex. "@/lib/supabase" eller "../lib/supabase"
 
-import { detectCategory, normalizeName } from "../lib/category";
+import { normalizeName, detectCategoryFromDB } from "../lib/category";
 
 type Item = {
   id: string;
@@ -49,10 +49,17 @@ export default function Home() {
   const [listsError, setListsError] = useState<string | null>(null);
   const [shareEmail, setShareEmail] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [editListOpen, setEditListOpen] = useState(false);
+  const [editListName, setEditListName] = useState("");
+  const [createListOpen, setCreateListOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+
   // Förslag
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [filtered, setFiltered] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [categoryPopupOpen, setCategoryPopupOpen] = useState(false);
+  const [pendingItem, setPendingItem] = useState<{ name: string } | null>(null);
 
   // Fokus: endast efter "Lägg till" (inte efter bock/undo/delete)
   const focusAfterAddRef = useRef(false);
@@ -77,6 +84,8 @@ export default function Home() {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [inlineMsg, setInlineMsg] = useState<string | null>(null);
   const inlineMsgTimerRef = useRef<number | null>(null);
+
+  const [categories, setCategories] = useState<string[]>([]);
 
 
   const { todoItems, doneItems } = useMemo(() => {
@@ -127,19 +136,32 @@ const isAddDisabled =
     cursor: "pointer",
   };
 
-async function signInWithEmail() {
+async function signInWithEmail() { 
+  console.log('🔑 Försöker skicka kod...');
   const email = loginEmail.trim();
-  if (!email) return;
+  console.log('📧 Email:', email);
+  
+  if (!email) {
+    console.log('❌ Email är tom!');
+    return;
+  }
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      shouldCreateUser: true,  // skapar konto automatiskt om det inte finns
+      shouldCreateUser: true,
     },
   });
 
-  if (error) alert(error.message);
-  else alert("En 6-siffrig kod har skickats till din email ✅");
+  console.log('📬 Supabase svar:', { error });
+
+  if (error) {
+    console.error('❌ Fel:', error);
+    alert(error.message);
+  } else {
+    console.log('✅ Kod skickad!');
+    alert("En 6-siffrig kod har skickats till din email ✅");
+  }
 }
 
 async function verifyOtp() {
@@ -191,6 +213,37 @@ async function loadOrCreateLists(userId: string) {
 
   return rows;
 }
+async function deleteList() {
+  if (!activeListId || lists.length <= 1) {
+    showInlineMsg("Du måste ha minst en lista");
+    return;
+  }
+
+  const confirmDelete = window.confirm("Är du säker på att du vill ta bort denna lista? Alla varor kommer raderas.");
+  if (!confirmDelete) return;
+
+  const { error } = await supabase
+    .from("lists")
+    .delete()
+    .eq("id", activeListId);
+
+  if (error) {
+    console.error(error);
+    showInlineMsg("Kunde inte ta bort listan");
+    return;
+  }
+
+  // Uppdatera UI - byt till första kvarvarande listan
+  const remaining = lists.filter(l => l.id !== activeListId);
+  setLists(remaining);
+  
+  if (remaining.length > 0) {
+    setActiveListId(remaining[0].id);
+    localStorage.setItem("activeListId", remaining[0].id);
+  }
+  
+  showInlineMsg("Lista borttagen ✅");
+}
 
 async function addItemFromValue(
   value: string,
@@ -221,12 +274,14 @@ async function addItemFromValue(
     (i) => i.done && normalizeName(i.name) === norm
   );
   if (doneMatch) {
+    const category = await detectCategoryFromDB(trimmed.toLowerCase()) || "Övrigt";
+
     const { data, error } = await supabase
       .from("items")
       .update({
         done: false,
         name: trimmed,
-        category: detectCategory(trimmed),
+        category: category,
       })
       .eq("id", doneMatch.id)
       .select("*")
@@ -267,13 +322,23 @@ async function addItemFromValue(
     return;
   }
 
-  // 3) Annars: skapa ny (DB-INSERT)
-  const row = {
-    list_id: activeListId,
-    name: trimmed,
-    category: detectCategory(trimmed),
-    done: false,
-  };
+ const detectedCategory = await detectCategoryFromDB(trimmed.toLowerCase()) || "Övrigt";
+
+// Om okänd kategori → visa popup
+if (detectedCategory === "Övrigt") {
+  setPendingItem({ name: trimmed });
+  setCategoryPopupOpen(true);
+  setText(""); // Rensa input
+  return;
+}
+
+// Annars: skapa ny (DB-INSERT)
+const row = {
+  list_id: activeListId,
+  name: trimmed,
+  category: detectedCategory,
+  done: false,
+};
 
   const { data, error } = await supabase
     .from("items")
@@ -597,6 +662,75 @@ async function inviteByEmail(email: string) {
   showInlineMsg("Listan är delad ✅");
 }
 
+async function updateListName(newName: string) {
+  if (!activeListId) return;
+  
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    showInlineMsg("Listnamn kan inte vara tomt");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("lists")
+    .update({ name: trimmed })
+    .eq("id", activeListId);
+
+  if (error) {
+    console.error(error);
+    showInlineMsg("Kunde inte uppdatera listnamn");
+    return;
+  }
+
+  // Uppdatera lokalt i UI
+  setLists(prev => prev.map(l => 
+    l.id === activeListId ? { ...l, name: trimmed } : l
+  ));
+  
+  showInlineMsg("Listnamn uppdaterat ✅");
+}
+
+async function createNewList(name: string) {
+  if (!session?.user?.id) return;
+  
+  const trimmed = name.trim();
+  if (!trimmed) {
+    showInlineMsg("Listnamn kan inte vara tomt");
+    return;
+  }
+
+  // Skapa listan
+  const { data: newList, error: listErr } = await supabase
+    .from("lists")
+    .insert({ name: trimmed, created_by: session.user.id })
+    .select("id,name")
+    .single();
+
+  if (listErr) {
+    console.error(listErr);
+    showInlineMsg("Kunde inte skapa lista");
+    return;
+  }
+
+  // Lägg till användaren som medlem
+  const { error: memErr } = await supabase
+    .from("list_members")
+    .insert({ list_id: newList.id, user_id: session.user.id, role: "owner" });
+
+  if (memErr) {
+    console.error(memErr);
+    showInlineMsg("Kunde inte lägga till dig i listan");
+    return;
+  }
+
+  // Uppdatera UI
+  setLists(prev => [...prev, newList]);
+  setActiveListId(newList.id);
+  localStorage.setItem("activeListId", newList.id);
+  
+  showInlineMsg("Lista skapad ✅");
+}
+
   function startEditing(item: Item) {
     setOpenId(null);
     setEditingId(item.id);
@@ -641,10 +775,11 @@ async function inviteByEmail(email: string) {
   );
   if (existsDone) {
 
+    const cat1 = await detectCategoryFromDB(trimmed.toLowerCase()) || "Övrigt";
     // a) sätt KLART-itemet till todo + uppdatera namn/kategori
     const { error: upErr } = await supabase
       .from("items")
-      .update({ done: false, name: trimmed, category: detectCategory(trimmed) })
+      .update({ done: false, name: trimmed, category: cat1 })
       .eq("id", existsDone.id);
 
     if (upErr) {
@@ -662,11 +797,13 @@ async function inviteByEmail(email: string) {
       return;
     }
 
+    const category = await detectCategoryFromDB(trimmed.toLowerCase()) || "Övrigt";
+
     // UI
     const next = items
       .map((i) =>
         i.id === existsDone.id
-          ? { ...i, done: false, name: trimmed, category: detectCategory(trimmed), createdAt: Date.now() }
+          ? { ...i, done: false, name: trimmed, category: category, createdAt: Date.now() }
           : i
       )
       .filter((i) => i.id !== id);
@@ -677,10 +814,12 @@ async function inviteByEmail(email: string) {
     return;
   }
 
+  const cat2 = await detectCategoryFromDB(trimmed.toLowerCase()) || "Övrigt";
+
   // 3) Normal edit: uppdatera i DB + state
   const { data, error } = await supabase
     .from("items")
-    .update({ name: trimmed, category: detectCategory(trimmed) })
+    .update({ name: trimmed, category: cat2 })
     .eq("id", id)
     .select("*")
     .single();
@@ -765,20 +904,6 @@ async function inviteByEmail(email: string) {
     sub.subscription.unsubscribe();
   };
 }, []);
-
-  useEffect(() => {
-    async function loadSuggestions() {
-      const res = await fetch("/suggestions.txt");
-      const textFile = await res.text();
-      const list = textFile
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      setSuggestions(list);
-    }
-    loadSuggestions();
-  }, []);
 
   useEffect(() => {
   if (!session?.user?.id) return;
@@ -896,6 +1021,22 @@ async function inviteByEmail(email: string) {
     };
   }, []);
 
+  useEffect(() => {
+  // Hämta alla unika kategorier från databasen
+  async function loadCategories() {
+    const { data } = await supabase
+      .from('ingredients')
+      .select('category')
+      .eq('approved', true);
+    
+    if (data) {
+      const unique = [...new Set(data.map(d => d.category))];
+      setCategories(unique);
+    }
+  }
+  loadCategories();
+}, []);
+
   function getX(id: string) {
   if (dragXById[id] != null) return dragXById[id];
   return openId === id ? -SWIPE_OPEN_PX : 0;
@@ -905,11 +1046,8 @@ async function inviteByEmail(email: string) {
     <main style={{ maxWidth: 560, margin: "0 auto", padding: "44px 18px 100px" }}>
       <div style={{ marginBottom: 20 }}>
   <div style={{ fontSize: 11, color: "#bbb", fontWeight: 500, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 4 }}>
-    Hushållets lista
+    Mina hushållslistor
   </div>
-  <h1 style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Syne', sans-serif", letterSpacing: "-0.02em", color: "#1a1a1a", margin: 0 }}>
-    Hemmet 🦦
-  </h1>
 </div>
       {!session ? (
   <>
@@ -999,47 +1137,111 @@ async function inviteByEmail(email: string) {
       Fel: {listsError}
     </div>
   )}
-   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-  <select
-    value={activeListId ?? ""}
-    onChange={(e) => {
-      const id = e.target.value;
-      setActiveListId(id);
-      localStorage.setItem("activeListId", id);
-    }}
-    style={{
-      padding: "8px 10px",
-      borderRadius: 12,
-      border: "1px solid #d6d6d6",
-      background: "white",
-      fontWeight: 700,
-    }}
-    disabled={lists.length === 0}
-  >
-    {lists.length === 0 ? (
-      <option value="">Laddar listor...</option>
-    ) : (
-      lists.map((l) => (
-        <option key={l.id} value={l.id}>
-          {l.name}
-        </option>
-      ))
-    )}
-  </select>
-  <button
-    type="button"
-    onClick={() => setShareOpen(true)}
-    style={{
-      ...buttonStyle,
-      height: 40,
-      padding: "0 14px",
-      borderRadius: 14,
-      border: "1px solid #d6d6d6",
-      fontSize: 16,
-    }}
-  >
-    Dela
-  </button>
+   <div style={{ marginBottom: 8 }}>
+  {/* Rad 1: Lista + Redigera + Ta bort */}
+  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+    <select
+      value={activeListId ?? ""}
+      onChange={(e) => {
+        const id = e.target.value;
+        setActiveListId(id);
+        localStorage.setItem("activeListId", id);
+      }}
+      style={{
+        flex: 1,
+        padding: "8px 10px",
+        borderRadius: 12,
+        border: "1px solid #d6d6d6",
+        background: "white",
+        fontWeight: 700,
+      }}
+      disabled={lists.length === 0}
+    >
+      {lists.length === 0 ? (
+        <option value="">Laddar listor...</option>
+      ) : (
+        lists.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name}
+          </option>
+        ))
+      )}
+    </select>
+
+    <button
+      type="button"
+      onClick={() => {
+        const currentList = lists.find(l => l.id === activeListId);
+        if (currentList) {
+          setEditListName(currentList.name);
+          setEditListOpen(true);
+        }
+      }}
+      style={{
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid #d6d6d6",
+        background: "white",
+        cursor: "pointer",
+        fontSize: 14,
+      }}
+    >
+      ✏️
+    </button>
+
+    <button
+      type="button"
+      onClick={deleteList}
+      disabled={lists.length <= 1}
+      style={{
+        padding: "6px 8px",
+        borderRadius: 8,
+        border: "1px solid #d6d6d6",
+        background: lists.length <= 1 ? "#f5f5f5" : "white",
+        cursor: lists.length <= 1 ? "not-allowed" : "pointer",
+        fontSize: 14,
+        opacity: lists.length <= 1 ? 0.5 : 1,
+      }}
+    >
+      🗑️
+    </button>
+  </div>
+
+  {/* Rad 2: Dela + Ny lista */}
+  <div style={{ display: "flex", gap: 8 }}>
+    <button
+      type="button"
+      onClick={() => setShareOpen(true)}
+      style={{
+        ...buttonStyle,
+        flex: 1,
+        height: 40,
+        borderRadius: 14,
+        border: "1px solid #d6d6d6",
+        fontSize: 14,
+      }}
+    >
+      Dela
+    </button>
+
+    <button
+      type="button"
+      onClick={() => {
+        setNewListName("");
+        setCreateListOpen(true);
+      }}
+      style={{
+        ...buttonStyle,
+        flex: 1,
+        height: 40,
+        borderRadius: 14,
+        border: "1px solid #d6d6d6",
+        fontSize: 14,
+      }}
+    >
+      + Ny lista
+    </button>
+  </div>
 </div>
       <form onSubmit={onSubmit} style={{ display: "flex", gap: 8 }}>
   <input
@@ -1059,7 +1261,7 @@ async function inviteByEmail(email: string) {
       padding: "0 16px",
       border: "1.5px solid #ede9e2",
       borderRadius: 14,
-      fontSize: 15,
+      fontSize: 16,
       outline: "none",
       background: "#fff",
       fontFamily: "'DM Sans', sans-serif",
@@ -1508,6 +1710,267 @@ async function inviteByEmail(email: string) {
     </button>
   </div>
 )}
+
+      {/* KATEGORI-POPUP */}
+{categoryPopupOpen && pendingItem && (
+  <div
+      onClick={() => {
+      setCategoryPopupOpen(false);
+      setPendingItem(null);
+    }}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.35)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      zIndex: 1000,
+    }}
+  >
+    <div
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        background: "white",
+        borderRadius: 14,
+        border: "1px solid #ddd",
+        padding: 14,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      }}
+    >
+      <div style={{ fontWeight: 900, marginBottom: 10 }}>Välj kategori</div>
+      <p style={{ fontSize: 14, color: "#666", marginBottom: 12 }}>
+        "{pendingItem.name}" – vilken kategori passar bäst?
+      </p>
+
+      <div style={{ 
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        maxHeight: "60vh",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch"
+      }}>
+        
+        {categories.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={async () => {
+              // 1) Spara ingrediensen i databasen (förslag, väntar på godkännande)
+              await supabase
+                .from('ingredients')
+                .upsert({ 
+                  name: pendingItem.name.toLowerCase(), 
+                  category: category
+                }, { 
+                  onConflict: 'name' 
+                });
+
+              // 2) Lägg till i användarens lista
+              const row = {
+                list_id: activeListId!,
+                name: pendingItem.name,
+                category: category,
+                done: false,
+              };
+
+              const { data, error } = await supabase
+                .from("items")
+                .insert(row)
+                .select("*")
+                .single();
+
+              if (error) {
+                console.error(error);
+                showInlineMsg("Kunde inte spara i databasen");
+                return;
+              }
+
+              const newItem: Item = {
+                id: data.id,
+                name: data.name,
+                category: data.category,
+                done: data.done,
+                createdAt: new Date(data.created_at).getTime(),
+              };
+
+              setItems((prev) => [newItem, ...prev]);
+              setCategoryPopupOpen(false);
+              setPendingItem(null);
+              showUndo("Vara tillagd", { type: "add", item: newItem });
+            }}
+           style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1px solid #ede9e2",
+              background: "white",
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: 14,
+              textAlign: "left",
+            }}
+          >
+            {category}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => {
+            setCategoryPopupOpen(false);
+            setPendingItem(null);
+          }}
+          style={buttonStyle}
+        >
+          Avbryt
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* REDIGERA LISTA-POPUP */}
+{editListOpen && (
+  <div
+    onClick={() => setEditListOpen(false)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.35)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      zIndex: 1000,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        background: "white",
+        borderRadius: 14,
+        border: "1px solid #ddd",
+        padding: 14,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      }}
+    >
+      <div style={{ fontWeight: 900, marginBottom: 10 }}>Redigera lista</div>
+
+      <input
+        autoFocus
+        value={editListName}
+        onChange={(e) => setEditListName(e.target.value)}
+        placeholder="Listnamn"
+        style={{ ...fieldStyle, width: "100%", fontSize: 16 }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setEditListOpen(false);
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void updateListName(editListName);
+            setEditListOpen(false);
+          }
+        }}
+      />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => setEditListOpen(false)}
+          style={buttonStyle}
+        >
+          Avbryt
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            void updateListName(editListName);
+            setEditListOpen(false);
+          }}
+          style={buttonStyle}
+        >
+          Spara
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* SKAPA NY LISTA-POPUP */}
+{createListOpen && (
+  <div
+    onClick={() => setCreateListOpen(false)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.35)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      zIndex: 1000,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        background: "white",
+        borderRadius: 14,
+        border: "1px solid #ddd",
+        padding: 14,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      }}
+    >
+      <div style={{ fontWeight: 900, marginBottom: 10 }}>Skapa ny lista</div>
+
+      <input
+        autoFocus
+        value={newListName}
+        onChange={(e) => setNewListName(e.target.value)}
+        placeholder="Namn på lista"
+        style={{ ...fieldStyle, width: "100%", fontSize: 16 }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setCreateListOpen(false);
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void createNewList(newListName);
+            setCreateListOpen(false);
+          }
+        }}
+      />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={() => setCreateListOpen(false)}
+          style={buttonStyle}
+        >
+          Avbryt
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            void createNewList(newListName);
+            setCreateListOpen(false);
+          }}
+          style={buttonStyle}
+        >
+          Skapa
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {shareOpen && (
   <div
     onMouseDown={() => setShareOpen(false)}
@@ -1541,7 +2004,7 @@ async function inviteByEmail(email: string) {
         value={shareEmail}
         onChange={(e) => setShareEmail(e.target.value)}
         placeholder="E-postadress"
-        style={{ ...fieldStyle, width: "100%" }}
+        style={{ ...fieldStyle, width: "100%", fontSize: 16 }}
         onKeyDown={(e) => {
           if (e.key === "Escape") setShareOpen(false);
           if (e.key === "Enter") {
@@ -1581,6 +2044,7 @@ async function inviteByEmail(email: string) {
     </div>
   </div>
 )}
+
       </>
 )}
     </main>

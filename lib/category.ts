@@ -1,14 +1,16 @@
-import { CATEGORY_RULES } from "./categoryRules";
+import { supabase } from './supabase';
 
-export function detectCategory(name: string): string {
-  const n = name.toLowerCase();
+// Kolla om ingrediens finns i databasen
+export async function detectCategoryFromDB(name: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('ingredients')
+    .select('category')
+    .eq('name', name.toLowerCase())
+    .eq('approved', true)
+    .single();
 
-  for (const rule of CATEGORY_RULES) {
-    if (rule.words.some((w) => n.includes(w))) {
-      return rule.category;
-    }
-  }
-  return "Övrigt";
+  if (error || !data) return null;
+  return data.category;
 }
 
 export function normalizeName(s: string) {
